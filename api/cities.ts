@@ -1,4 +1,4 @@
-import { cityProfiles } from "../src/data";
+import { cityProfiles } from "../src/data.js";
 
 export const config = { runtime: "edge" };
 

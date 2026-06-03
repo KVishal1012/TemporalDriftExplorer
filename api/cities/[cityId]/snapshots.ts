@@ -1,4 +1,4 @@
-import { cityProfiles, type CityKey } from "../../../src/data";
+import { cityProfiles, type CityKey } from "../../../src/data.js";
 
 export const config = { runtime: "edge" };
 
