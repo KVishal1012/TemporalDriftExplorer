@@ -68,6 +68,12 @@ Run the TypeScript check:
 npm run typecheck
 ```
 
+Run the launch-scope smoke check:
+
+```bash
+npm run smoke
+```
+
 ## Project Structure
 
 ```text
@@ -76,6 +82,9 @@ public/assets/chennai-anna-salai.jpg   Chennai launch corridor backdrop
 src/App.tsx                            Main interactive workspace
 src/data.ts                            Typed city profiles, snapshots, events, findings, and evidence
 src/styles.css                         Desktop and tablet visual system
+api/cities.ts                          JSON-backed launch city listing
+api/cities/[cityId]/profile.ts         City profile endpoint
+api/cities/[cityId]/snapshots.ts       Temporal snapshot endpoint
 ```
 
 ## Data Model
@@ -90,6 +99,18 @@ The seeded frontend data boundary is intentionally typed and replaceable:
 - `EvidenceSeries` powers the supporting trend charts.
 
 This keeps the current demo deterministic while leaving a clear path to a production architecture.
+
+## API Boundary
+
+The current API is JSON-backed by the same typed city profiles used by the frontend:
+
+- `GET /api/cities`
+- `GET /api/cities/toronto/profile`
+- `GET /api/cities/toronto/snapshots`
+- `GET /api/cities/chennai/profile`
+- `GET /api/cities/chennai/snapshots`
+
+Unsupported cities return a message that Temporal Drift Explorer currently supports Toronto and Chennai only.
 
 ## Future Direction
 
