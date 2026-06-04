@@ -1,18 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BarChart3, Bookmark, CalendarDays, ChevronDown, ChevronLeft, ChevronRight,
-  CircleHelp, Download, Layers3, LocateFixed, Menu, MessageSquareText, Minus,
-  Pause, Play, Plus, Search, Settings, Share2, Sparkles, Users, X,
+  CircleHelp, Download, Layers3, Menu, MessageSquareText, Pause, Play, Search,
+  Settings, Share2, Sparkles, Users, X,
 } from "lucide-react";
-import { cityProfiles, initialLayers, years, type CityKey, type EvidenceSeries, type LayerKey } from "./data";
-
-const zoningParcels = [
-  ["5,4 34,2 34,28 3,32", "#7b68ad"], ["38,2 66,2 66,25 38,27", "#df8c3d"],
-  ["70,2 98,2 98,25 70,26", "#d8ba3d"], ["3,35 32,31 34,61 2,63", "#639463"],
-  ["38,30 65,28 67,62 39,63", "#d55d4d"], ["71,30 98,29 98,62 70,64", "#d7bb41"],
-  ["2,67 34,66 34,98 2,98", "#446ea9"], ["39,67 66,66 67,98 39,98", "#7b68ad"],
-  ["71,67 98,66 98,98 71,98", "#65945e"],
-];
+import { alphaEarthSummaries, cityProfiles, initialLayers, years, type CityKey, type EvidenceSeries, type LayerKey } from "./data";
+import MapCanvas from "./MapCanvas";
 
 function Sparkline({ series }: { series: EvidenceSeries }) {
   const max = Math.max(...series.values);
@@ -27,6 +20,8 @@ function Sparkline({ series }: { series: EvidenceSeries }) {
     <polyline points={points} fill="none" stroke={series.color} strokeWidth="2" vectorEffect="non-scaling-stroke" />
   </svg>;
 }
+
+const humanizeStatus = (status: string) => status.replace(/-/g, " ");
 
 function App() {
   const [year, setYear] = useState(2018);
@@ -43,6 +38,8 @@ function App() {
 
   const profile = cityProfiles[city];
   const snapshot = useMemo(() => profile.snapshots.find((item) => item.year === year)!, [profile, year]);
+  const alphaEarth = alphaEarthSummaries[city];
+  const sourceById = useMemo(() => new Map(profile.sources.map((source) => [source.id, source])), [profile.sources]);
 
   useEffect(() => {
     if (!playing) return;
@@ -116,44 +113,14 @@ function App() {
 
       <button className="collapse-left" onClick={() => setLeftOpen(!leftOpen)}><ChevronLeft size={16} /></button>
 
-      <section className="map-stage">
-        <img className="map-image" src={profile.asset} alt={profile.alt} />
-        <svg className="map-overlays" viewBox="0 0 100 100" preserveAspectRatio="none">
-          {layer("zoning").enabled && <g opacity={layer("zoning").opacity / 150}>
-            {zoningParcels.map(([points, fill]) => <polygon key={points} points={points} fill={fill} stroke="rgba(255,255,255,.48)" strokeWidth=".22" />)}
-          </g>}
-          {layer("demographics").enabled && <g opacity={layer("demographics").opacity / 180}>
-            <rect x="72" width="28" height="100" fill="#d1b83d" /><rect width="32" height="100" fill="#4278a2" />
-          </g>}
-          {layer("business").enabled && <g opacity={layer("business").opacity / 100}>
-            <path d="M46 -2 C43 16 46 31 47 46 C50 60 51 76 54 102" fill="none" stroke="url(#heat)" strokeWidth={Math.max(7, snapshot.businessIntensity / 7)} strokeLinecap="round" />
-            <defs><linearGradient id="heat" x1="0" x2="1"><stop stopColor="#6c3e9f" /><stop offset=".46" stopColor="#d54f54" /><stop offset=".8" stopColor="#ff9d49" /><stop offset="1" stopColor="#ffe46a" /></linearGradient></defs>
-          </g>}
-          <path className="corridor" d="M39 5 L54 3 L57 21 L55 39 L59 58 L64 77 L63 96 L49 98 L47 79 L43 62 L42 43 L40 24 Z" />
-        </svg>
-        {compare && <div className="swipe" style={{ left: `${swipe}%` }}><div className="before-after"><span>Before<br /><b>2012</b></span><span>After<br /><b>{year}</b></span></div><button>‹ ›</button></div>}
-        <input
-          className="swipe-range"
-          aria-label="Before and after comparison divider"
-          type="range"
-          min="8"
-          max="92"
-          value={swipe}
-          onChange={(event) => setSwipe(Number(event.target.value))}
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "ew-resize" }}
-        />
-        {profile.findings.map((finding) => <button key={finding.id} style={{ left: `${finding.position.x}%`, top: `${finding.position.y}%` }} onClick={() => setActiveFinding(finding.id)} className={`map-pin ${activeFinding === finding.id ? "pin-active" : ""}`}>{finding.id}</button>)}
-        <div className="map-label label-one">{profile.labels[0]}</div><div className="map-label label-two">{profile.labels[1]}</div><div className="map-label label-three">{profile.labels[2]}</div>
-        <div className="map-tools"><button><Plus /></button><button><Minus /></button><button><LocateFixed /></button><button className="map-3d">3D</button></div>
-        <div className="scale">300 m</div>
-      </section>
+      <MapCanvas profile={profile} layers={layers} snapshot={snapshot} activeFinding={activeFinding} compare={compare} swipe={swipe} year={year} onFindingSelect={setActiveFinding} onSwipeChange={setSwipe} />
 
       <button className="collapse-right" onClick={() => setRightOpen(!rightOpen)}><ChevronRight size={16} /></button>
       <aside className={`explainer ${rightOpen ? "" : "panel-hidden"}`}>
         <div className="explainer-heading"><Sparkles size={18} /> <h2>Spatial Explainer</h2><ChevronDown size={16} /><X size={17} /></div>
         <label className="question-label">Your question</label>
         <button className="question" onClick={runAnalysis}>{profile.question}</button>
-        <div className="asked">Seeded analysis · click question to refresh</div>
+        <div className="asked">Provider-backed scaffold · fallback values are labeled</div>
         <div className="findings-title">Findings (anchored to map)</div>
         {explainer === "loading" ? <div className="loading"><Sparkles /> Analyzing temporal signals…</div> : <div className="findings">
           {profile.findings.map((finding) => <button className={`finding ${activeFinding === finding.id ? "selected" : ""}`} key={finding.id} onClick={() => setActiveFinding(finding.id)}>
@@ -162,9 +129,12 @@ function App() {
         </div>}
         <div className="evidence-heading">Causal evidence <CircleHelp size={14} /></div>
         {profile.evidence.map((series) => <div className="evidence-row" key={series.label}>
-          <div className="evidence-label">{series.label}</div><div className="chart-row"><b>{series.startValue}</b><Sparkline series={series} /><b>{series.endValue}</b><small>Source:<br />{series.source}</small></div>
+          <div className="evidence-label">{series.label}</div><div className="chart-row"><b>{series.startValue}</b><Sparkline series={series} /><b>{series.endValue}</b><small>{series.provenance === "seeded-fallback" ? "Seeded fallback" : "Source"}:<br />{sourceById.get(series.sourceId)?.name ?? series.sourceId}</small></div>
         </div>)}
-        <div className="ai-note">AI-generated. Verify important information.</div>
+        <div className="source-list">
+          {profile.sources.map((source) => <span key={source.id}>{source.name}: {humanizeStatus(source.status)}</span>)}
+        </div>
+        <div className="ai-note">{alphaEarth.attribution} Current AlphaEarth status: {humanizeStatus(alphaEarth.status)}.</div>
       </aside>
     </section>
 

@@ -39,7 +39,8 @@ Each explainer returns map-anchored findings that can be selected from the expla
 - TypeScript
 - Vite
 - Lucide React icons
-- Local generated aerial imagery for Toronto and Chennai
+- Google Maps JavaScript API-ready basemap component with a no-key fallback
+- AlphaEarth Foundations provider metadata and API scaffold
 - Code-native SVG overlays for zoning, density, corridor boundaries, and map pins
 
 ## Getting Started
@@ -74,17 +75,25 @@ Run the launch-scope smoke check:
 npm run smoke
 ```
 
+Configure Google Maps for the live basemap:
+
+```bash
+VITE_GOOGLE_MAPS_API_KEY=your_google_maps_browser_key
+VITE_GOOGLE_MAP_ID=your_optional_vector_map_id
+```
+
 ## Project Structure
 
 ```text
-public/assets/toronto-king-west.jpg    Toronto launch corridor backdrop
-public/assets/chennai-anna-salai.jpg   Chennai launch corridor backdrop
 src/App.tsx                            Main interactive workspace
-src/data.ts                            Typed city profiles, snapshots, events, findings, and evidence
+src/data.ts                            Typed city profiles, source metadata, snapshots, layers, AlphaEarth summaries
+src/MapCanvas.tsx                      Native Google Maps JavaScript API map surface
 src/styles.css                         Desktop and tablet visual system
 api/cities.ts                          JSON-backed launch city listing
 api/cities/[cityId]/profile.ts         City profile endpoint
 api/cities/[cityId]/snapshots.ts       Temporal snapshot endpoint
+api/cities/[cityId]/layers.ts          Layer observations and source metadata
+api/cities/[cityId]/alphaearth.ts      AlphaEarth Foundations metadata endpoint
 ```
 
 ## Data Model
@@ -107,10 +116,26 @@ The current API is JSON-backed by the same typed city profiles used by the front
 - `GET /api/cities`
 - `GET /api/cities/toronto/profile`
 - `GET /api/cities/toronto/snapshots`
+- `GET /api/cities/toronto/layers`
+- `GET /api/cities/toronto/alphaearth`
 - `GET /api/cities/chennai/profile`
 - `GET /api/cities/chennai/snapshots`
+- `GET /api/cities/chennai/layers`
+- `GET /api/cities/chennai/alphaearth`
 
 Unsupported cities return a message that Temporal Drift Explorer currently supports Toronto and Chennai only.
+
+## Data Provenance
+
+The UI now distinguishes source types:
+
+- `live-civic-data`: source slots for Toronto Open Data, TTC, Statistics Canada, CMDA, and CMRL.
+- `alphaearth-embedding`: AlphaEarth Foundations Satellite Embedding V1 Annual metadata.
+- `seeded-fallback`: temporary demo values that must not be treated as real measurements.
+
+AlphaEarth attribution: “The AlphaEarth Foundations Satellite Embedding dataset is produced by Google and Google DeepMind.”
+
+The previous generated corridor JPEG backdrops have been removed. The map surface now attempts to load Google Maps when `VITE_GOOGLE_MAPS_API_KEY` is configured. Without a key, the app keeps working with the code-native corridor overlays and displays a configuration notice instead of pretending that synthetic imagery is real.
 
 ## Future Direction
 
@@ -118,10 +143,10 @@ A full-stack version can replace the local seed module with:
 
 - TimescaleDB time-travel queries for historical spatial snapshots
 - Toronto and Chennai parcel, zoning, business, mobility, and demographic datasets
-- Live map tiles through MapLibre or another mapping engine
+- Live Google Maps layers and/or MapLibre tiles where licensing and data access fit the market
 - A retrieval layer that assembles temporal and spatial evidence
 - An LLM endpoint that returns cited, map-anchored explanations
 
 ## Current Status
 
-This repository contains an interactive frontend demo for Toronto and Chennai. It does not yet connect to TimescaleDB, external map tiles, or a live model endpoint.
+This repository contains an interactive frontend demo for Toronto and Chennai with a Google Maps-ready map surface, civic source metadata, AlphaEarth Foundations metadata, and JSON API boundaries. It does not yet run live TimescaleDB queries, fetch Google Earth Engine embeddings, ingest civic datasets, or call a live model endpoint.
