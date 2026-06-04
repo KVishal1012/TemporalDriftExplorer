@@ -6,7 +6,7 @@ import {
   type CityKey,
   type LayerObservation,
   type RealDataSource,
-} from "./data";
+} from "./data.js";
 
 type EnvMap = Record<string, string | undefined>;
 
