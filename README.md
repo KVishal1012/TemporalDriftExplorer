@@ -82,6 +82,18 @@ VITE_GOOGLE_MAPS_API_KEY=your_google_maps_browser_key
 VITE_GOOGLE_MAP_ID=your_optional_vector_map_id
 ```
 
+Configure server-only integration credentials when moving beyond the fallback demo:
+
+```bash
+TIMESCALE_DATABASE_URL=postgresql://...
+GOOGLE_APPLICATION_CREDENTIALS_JSON=...
+EARTH_ENGINE_SERVICE_ACCOUNT=...
+EARTH_ENGINE_PRIVATE_KEY=...
+ALPHAEARTH_GCS_BUCKET=...
+```
+
+Use `.env.example` as the template. Only `VITE_*` variables are browser-exposed; TimescaleDB and AlphaEarth credentials must stay server-side.
+
 ## Project Structure
 
 ```text
@@ -89,11 +101,18 @@ src/App.tsx                            Main interactive workspace
 src/data.ts                            Typed city profiles, source metadata, snapshots, layers, AlphaEarth summaries
 src/MapCanvas.tsx                      Native Google Maps JavaScript API map surface
 src/styles.css                         Desktop and tablet visual system
+src/providers.ts                       Integration readiness, source split, and AlphaEarth extraction contracts
+src/timescaleSchema.ts                 API-exportable TimescaleDB schema
+db/timescale_schema.sql                Database setup draft for the source-backed alpha
 api/cities.ts                          JSON-backed launch city listing
 api/cities/[cityId]/profile.ts         City profile endpoint
 api/cities/[cityId]/snapshots.ts       Temporal snapshot endpoint
 api/cities/[cityId]/layers.ts          Layer observations and source metadata
 api/cities/[cityId]/alphaearth.ts      AlphaEarth Foundations metadata endpoint
+api/cities/[cityId]/sources.ts         City source readiness endpoint
+api/cities/[cityId]/explain.ts         Retrieval-shaped explainer payload endpoint
+api/integrations.ts                    Google Maps, TimescaleDB, and AlphaEarth readiness endpoint
+api/timescale/schema.ts                TimescaleDB SQL schema endpoint
 ```
 
 ## Data Model
@@ -117,11 +136,17 @@ The current API is JSON-backed by the same typed city profiles used by the front
 - `GET /api/cities/toronto/profile`
 - `GET /api/cities/toronto/snapshots`
 - `GET /api/cities/toronto/layers`
+- `GET /api/cities/toronto/sources`
 - `GET /api/cities/toronto/alphaearth`
+- `GET /api/cities/toronto/explain`
 - `GET /api/cities/chennai/profile`
 - `GET /api/cities/chennai/snapshots`
 - `GET /api/cities/chennai/layers`
+- `GET /api/cities/chennai/sources`
 - `GET /api/cities/chennai/alphaearth`
+- `GET /api/cities/chennai/explain`
+- `GET /api/integrations`
+- `GET /api/timescale/schema`
 
 Unsupported cities return a message that Temporal Drift Explorer currently supports Toronto and Chennai only.
 
@@ -136,6 +161,13 @@ The UI now distinguishes source types:
 AlphaEarth attribution: “The AlphaEarth Foundations Satellite Embedding dataset is produced by Google and Google DeepMind.”
 
 The previous generated corridor JPEG backdrops have been removed. The map surface now attempts to load Google Maps when `VITE_GOOGLE_MAPS_API_KEY` is configured. Without a key, the app keeps working with the code-native corridor overlays and displays a configuration notice instead of pretending that synthetic imagery is real.
+
+The next alpha boundary is now explicit:
+
+- Toronto and Chennai each have a source-metadata-ready civic ingestion target.
+- `/api/cities/:cityId/sources` separates source-metadata layer rows from fallback layer rows.
+- `/api/cities/:cityId/alphaearth` returns the server-only AlphaEarth extraction plan.
+- `/api/timescale/schema` returns the TimescaleDB schema needed to replace seeded snapshots and layer observations.
 
 ## Future Direction
 

@@ -1,4 +1,4 @@
-import { cityProfiles, layerObservations, type CityKey } from "../../../src/data.js";
+import { cityProfiles, type CityKey } from "../../../src/data.js";
 import { getCitySourceReadiness } from "../../../src/providers.js";
 
 export const config = { runtime: "edge" };
@@ -21,15 +21,6 @@ export default function handler(request: Request) {
     }), { status: 404, headers });
   }
 
-  const readiness = getCitySourceReadiness(cityId);
-
-  return new Response(JSON.stringify({
-    cityId,
-    corridor: profile.corridor,
-    sources: profile.sources,
-    observations: layerObservations.filter((observation) => observation.cityId === cityId),
-    sourceMetadataObservations: readiness.sourceMetadataObservations,
-    fallbackObservations: readiness.fallbackObservations,
-    ingestionTargets: readiness.ingestionTargets,
-  }), { headers });
+  return new Response(JSON.stringify(getCitySourceReadiness(cityId)), { headers });
 }
+

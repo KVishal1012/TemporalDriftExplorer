@@ -1,4 +1,5 @@
 import { alphaEarthSummaries, cityProfiles, type CityKey } from "../../../src/data.js";
+import { buildAlphaEarthExtractionPlan, getIntegrationReadiness } from "../../../src/providers.js";
 
 export const config = { runtime: "edge" };
 
@@ -22,5 +23,7 @@ export default function handler(request: Request) {
 
   return new Response(JSON.stringify({
     alphaEarth: alphaEarthSummaries[cityId],
+    integration: getIntegrationReadiness().find((item) => item.id === "alphaearth"),
+    extractionPlan: buildAlphaEarthExtractionPlan(cityId),
   }), { headers });
 }

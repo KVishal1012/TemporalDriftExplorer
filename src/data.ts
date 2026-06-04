@@ -1,6 +1,7 @@
 export type LayerKey = "satellite" | "zoning" | "business" | "demographics";
 export type CityKey = "toronto" | "chennai";
 export type ProvenanceKind = "live-civic-data" | "alphaearth-embedding" | "seeded-fallback";
+export type SourceStatus = "source-metadata-ready" | "pending-live-ingestion";
 
 export interface LatLng {
   lat: number;
@@ -35,9 +36,10 @@ export interface RealDataSource {
   name: string;
   provider: string;
   country: "Canada" | "India" | "Global";
-  status: "ready" | "pending-live-ingestion";
+  status: SourceStatus;
   yearRange: string;
   url?: string;
+  ingestionTarget: "timescale-layer" | "alphaearth-summary" | "evidence-series";
   notes: string;
   provenance: ProvenanceKind;
 }
@@ -85,6 +87,18 @@ export interface LayerObservation {
   value: string;
 }
 
+export interface CivicIngestionTarget {
+  id: string;
+  cityId: CityKey;
+  sourceId: string;
+  layer: Exclude<LayerKey, "satellite">;
+  corridor: string;
+  providerEndpoint: string;
+  targetTable: string;
+  status: SourceStatus;
+  nextAction: string;
+}
+
 export interface AlphaEarthEmbeddingSummary {
   datasetId: "GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL";
   sourceId: "alphaearth-foundations";
@@ -124,6 +138,7 @@ export const alphaEarthSource: RealDataSource = {
   status: "pending-live-ingestion",
   yearRange: "2017-2024",
   url: "https://developers.google.com/earth-engine/datasets/catalog/GOOGLE_SATELLITE_EMBEDDING_V1_ANNUAL",
+  ingestionTarget: "alphaearth-summary",
   notes: "Annual 10 m satellite embeddings with 64 channels. Access requires Earth Engine or Google Cloud Storage credentials.",
   provenance: "alphaearth-embedding",
 };
@@ -208,9 +223,9 @@ export const cityProfiles: Record<CityKey, CityProfile> = {
       { label: "Residential index", startValue: "100", endValue: "126", sourceId: "statistics-canada", color: "#8a50aa", values: [100, 102, 104, 105, 108, 110, 112, 114, 116, 118, 120, 122, 124, 126], provenance: "seeded-fallback" },
     ],
     sources: [
-      { id: "toronto-open-data", name: "Toronto Open Data", provider: "City of Toronto", country: "Canada", status: "pending-live-ingestion", yearRange: "varies by dataset", url: "https://open.toronto.ca/", notes: "Source slot for parcel, zoning, business, and corridor civic layers.", provenance: "live-civic-data" },
-      { id: "ttc-open-data", name: "TTC Open Data", provider: "Toronto Transit Commission", country: "Canada", status: "pending-live-ingestion", yearRange: "varies by dataset", url: "https://open.toronto.ca/catalogue/?search=ttc", notes: "Source slot for transit-adjacent mobility and access signals.", provenance: "live-civic-data" },
-      { id: "statistics-canada", name: "Statistics Canada", provider: "Government of Canada", country: "Canada", status: "pending-live-ingestion", yearRange: "2016-2021+", url: "https://www.statcan.gc.ca/", notes: "Source slot for demographic and household observations.", provenance: "live-civic-data" },
+      { id: "toronto-open-data", name: "Toronto Open Data", provider: "City of Toronto", country: "Canada", status: "source-metadata-ready", yearRange: "varies by dataset", url: "https://open.toronto.ca/", ingestionTarget: "timescale-layer", notes: "Source slot for parcel, zoning, business, and corridor civic layers.", provenance: "live-civic-data" },
+      { id: "ttc-open-data", name: "TTC Open Data", provider: "Toronto Transit Commission", country: "Canada", status: "source-metadata-ready", yearRange: "varies by dataset", url: "https://open.toronto.ca/catalogue/?search=ttc", ingestionTarget: "evidence-series", notes: "Source slot for transit-adjacent mobility and access signals.", provenance: "live-civic-data" },
+      { id: "statistics-canada", name: "Statistics Canada", provider: "Government of Canada", country: "Canada", status: "source-metadata-ready", yearRange: "2016-2021+", url: "https://www.statcan.gc.ca/", ingestionTarget: "evidence-series", notes: "Source slot for demographic and household observations.", provenance: "live-civic-data" },
       alphaEarthSource,
     ],
   },
@@ -258,12 +273,37 @@ export const cityProfiles: Record<CityKey, CityProfile> = {
       { label: "Commercial intensity", startValue: "100", endValue: "138", sourceId: "cmda-planning", color: "#8a50aa", values: [100, 102, 105, 108, 112, 115, 118, 121, 124, 127, 130, 133, 136, 138], provenance: "seeded-fallback" },
     ],
     sources: [
-      { id: "cmda-planning", name: "CMDA planning datasets", provider: "Chennai Metropolitan Development Authority", country: "India", status: "pending-live-ingestion", yearRange: "varies by dataset", url: "https://cmdachennai.gov.in/", notes: "Source slot for planning, land-use, corridor, and redevelopment layers.", provenance: "live-civic-data" },
-      { id: "cmrl-open-data", name: "CMRL transit datasets", provider: "Chennai Metro Rail Limited", country: "India", status: "pending-live-ingestion", yearRange: "varies by dataset", url: "https://chennaimetrorail.org/", notes: "Source slot for metro access and transit-adjacent corridor signals.", provenance: "live-civic-data" },
+      { id: "cmda-planning", name: "CMDA planning datasets", provider: "Chennai Metropolitan Development Authority", country: "India", status: "source-metadata-ready", yearRange: "varies by dataset", url: "https://cmdachennai.gov.in/", ingestionTarget: "timescale-layer", notes: "Source slot for planning, land-use, corridor, and redevelopment layers.", provenance: "live-civic-data" },
+      { id: "cmrl-open-data", name: "CMRL transit datasets", provider: "Chennai Metro Rail Limited", country: "India", status: "source-metadata-ready", yearRange: "varies by dataset", url: "https://chennaimetrorail.org/", ingestionTarget: "evidence-series", notes: "Source slot for metro access and transit-adjacent corridor signals.", provenance: "live-civic-data" },
       alphaEarthSource,
     ],
   },
 };
+
+export const civicIngestionTargets: CivicIngestionTarget[] = [
+  {
+    id: "toronto-zoning-corridor",
+    cityId: "toronto",
+    sourceId: "toronto-open-data",
+    layer: "zoning",
+    corridor: "King Street West",
+    providerEndpoint: "https://open.toronto.ca/",
+    targetTable: "temporal.layer_observations",
+    status: "source-metadata-ready",
+    nextAction: "Select the authoritative Toronto zoning/package endpoint, then clip parcels to the King Street West corridor.",
+  },
+  {
+    id: "chennai-planning-corridor",
+    cityId: "chennai",
+    sourceId: "cmda-planning",
+    layer: "zoning",
+    corridor: "Anna Salai",
+    providerEndpoint: "https://cmdachennai.gov.in/",
+    targetTable: "temporal.layer_observations",
+    status: "source-metadata-ready",
+    nextAction: "Confirm CMDA land-use export access, then normalize planning polygons for the Anna Salai corridor.",
+  },
+];
 
 export const layerObservations: LayerObservation[] = Object.values(cityProfiles).flatMap((profile) => [
   ...profile.geometry.zoningParcels.map((parcel) => ({

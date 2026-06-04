@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { alphaEarthSummaries, cityProfiles, initialLayers, years, type CityKey, type EvidenceSeries, type LayerKey } from "./data";
 import MapCanvas from "./MapCanvas";
+import { getCitySourceReadiness, getIntegrationReadiness } from "./providers";
 
 function Sparkline({ series }: { series: EvidenceSeries }) {
   const max = Math.max(...series.values);
@@ -40,6 +41,11 @@ function App() {
   const snapshot = useMemo(() => profile.snapshots.find((item) => item.year === year)!, [profile, year]);
   const alphaEarth = alphaEarthSummaries[city];
   const sourceById = useMemo(() => new Map(profile.sources.map((source) => [source.id, source])), [profile.sources]);
+  const sourceReadiness = useMemo(() => getCitySourceReadiness(city), [city]);
+  const integrationReadiness = useMemo(() => getIntegrationReadiness({
+    VITE_GOOGLE_MAPS_API_KEY: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+    VITE_GOOGLE_MAP_ID: import.meta.env.VITE_GOOGLE_MAP_ID,
+  }), []);
 
   useEffect(() => {
     if (!playing) return;
@@ -109,6 +115,14 @@ function App() {
           <em>Business density (per acre)</em>
           <div className="density-gradient" /><div className="gradient-labels"><span>Low</span><span>High</span></div>
         </div>
+        <div className="readiness-card">
+          <div className="panel-title">Integration readiness <ChevronDown size={15} /></div>
+          {integrationReadiness.map((item) => <div className="readiness-row" key={item.id}>
+            <strong>{item.label}</strong>
+            <span className={item.status === "configured" ? "status-ok" : "status-waiting"}>{humanizeStatus(item.status)}</span>
+            <p>{item.message}</p>
+          </div>)}
+        </div>
       </aside>
 
       <button className="collapse-left" onClick={() => setLeftOpen(!leftOpen)}><ChevronLeft size={16} /></button>
@@ -133,6 +147,11 @@ function App() {
         </div>)}
         <div className="source-list">
           {profile.sources.map((source) => <span key={source.id}>{source.name}: {humanizeStatus(source.status)}</span>)}
+        </div>
+        <div className="source-metrics">
+          <span><b>{sourceReadiness.sourceMetadataObservations.length}</b> source-metadata layer rows</span>
+          <span><b>{sourceReadiness.fallbackObservations.length}</b> fallback layer rows</span>
+          <span><b>{sourceReadiness.ingestionTargets.length}</b> Timescale ingestion target</span>
         </div>
         <div className="ai-note">{alphaEarth.attribution} Current AlphaEarth status: {humanizeStatus(alphaEarth.status)}.</div>
       </aside>
