@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { CityProfile, LayerKey, LayerState, TemporalSnapshot } from "./data";
+import type { CityKey, CityProfile, LayerKey, LayerState, TemporalSnapshot } from "./data";
 
 declare global {
   interface Window {
@@ -29,6 +29,14 @@ interface MapCanvasProps {
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 const GOOGLE_MAP_ID = import.meta.env.VITE_GOOGLE_MAP_ID as string | undefined;
+const fallbackBusinessPath: Record<CityKey, string> = {
+  toronto: "M4 49 C18 47 31 49 45 50 C60 51 76 49 98 47",
+  chennai: "M46 -2 C43 16 46 31 47 46 C50 60 51 76 54 102",
+};
+const fallbackCorridorPath: Record<CityKey, string> = {
+  toronto: "M4 43 L22 41 L39 44 L58 43 L78 41 L98 43 L98 56 L80 58 L61 56 L42 58 L23 56 L4 58 Z",
+  chennai: "M39 5 L54 3 L57 21 L55 39 L59 58 L64 77 L63 96 L49 98 L47 79 L43 62 L42 43 L40 24 Z",
+};
 
 const loadGoogleMaps = () => {
   if (window.google?.maps) return Promise.resolve();
@@ -139,9 +147,9 @@ function MapCanvas({ profile, layers, snapshot, activeFinding, compare, swipe, y
       {layer(layers, "demographics").enabled && <g opacity={layer(layers, "demographics").opacity / 180}>
         <rect x="72" width="28" height="100" fill="#d1b83d" /><rect width="32" height="100" fill="#4278a2" />
       </g>}
-      {layer(layers, "business").enabled && <path d="M46 -2 C43 16 46 31 47 46 C50 60 51 76 54 102" fill="none" stroke="url(#heat)" strokeWidth={Math.max(7, snapshot.businessIntensity / 7)} strokeLinecap="round" opacity={layer(layers, "business").opacity / 100} />}
+      {layer(layers, "business").enabled && <path d={fallbackBusinessPath[profile.id]} fill="none" stroke="url(#heat)" strokeWidth={Math.max(7, snapshot.businessIntensity / 7)} strokeLinecap="round" opacity={layer(layers, "business").opacity / 100} />}
       <defs><linearGradient id="heat" x1="0" x2="1"><stop stopColor="#6c3e9f" /><stop offset=".46" stopColor="#d54f54" /><stop offset=".8" stopColor="#ff9d49" /><stop offset="1" stopColor="#ffe46a" /></linearGradient></defs>
-      <path className="corridor" d="M39 5 L54 3 L57 21 L55 39 L59 58 L64 77 L63 96 L49 98 L47 79 L43 62 L42 43 L40 24 Z" />
+      <path className="corridor" d={fallbackCorridorPath[profile.id]} />
     </svg>
     {compare && <div className="swipe" style={{ left: `${swipe}%` }}><div className="before-after"><span>Before<br /><b>2012</b></span><span>After<br /><b>{year}</b></span></div><button>‹ ›</button></div>}
     <input className="swipe-range" aria-label="Before and after comparison divider" type="range" min="8" max="92" value={swipe} onChange={(event) => onSwipeChange(Number(event.target.value))} />
