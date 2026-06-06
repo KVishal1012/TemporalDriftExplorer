@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { CityKey, CityProfile, LayerKey, LayerState, TemporalSnapshot } from "./data";
+import type { CityProfile, LatLng, LayerKey, LayerState, TemporalSnapshot } from "./data";
 
 declare global {
   interface Window {
@@ -29,14 +29,6 @@ interface MapCanvasProps {
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 const GOOGLE_MAP_ID = import.meta.env.VITE_GOOGLE_MAP_ID as string | undefined;
-const fallbackBusinessPath: Record<CityKey, string> = {
-  toronto: "M4 49 C18 47 31 49 45 50 C60 51 76 49 98 47",
-  chennai: "M46 -2 C43 16 46 31 47 46 C50 60 51 76 54 102",
-};
-const fallbackCorridorPath: Record<CityKey, string> = {
-  toronto: "M4 43 L22 41 L39 44 L58 43 L78 41 L98 43 L98 56 L80 58 L61 56 L42 58 L23 56 L4 58 Z",
-  chennai: "M39 5 L54 3 L57 21 L55 39 L59 58 L64 77 L63 96 L49 98 L47 79 L43 62 L42 43 L40 24 Z",
-};
 
 const loadGoogleMaps = () => {
   if (window.google?.maps) return Promise.resolve();
@@ -62,6 +54,43 @@ const loadGoogleMaps = () => {
 };
 
 const layer = (layers: LayerState[], id: LayerKey) => layers.find((item) => item.id === id)!;
+
+const getProjectionDomain = (profile: CityProfile) => {
+  const points = [
+    ...profile.geometry.bounds,
+    ...profile.geometry.businessDensityPath,
+    ...profile.findings.map((finding) => finding.anchor),
+  ];
+  const lats = points.map((point) => point.lat);
+  const lngs = points.map((point) => point.lng);
+  const latPadding = (Math.max(...lats) - Math.min(...lats)) * 0.18 || 0.002;
+  const lngPadding = (Math.max(...lngs) - Math.min(...lngs)) * 0.18 || 0.002;
+
+  return {
+    minLat: Math.min(...lats) - latPadding,
+    maxLat: Math.max(...lats) + latPadding,
+    minLng: Math.min(...lngs) - lngPadding,
+    maxLng: Math.max(...lngs) + lngPadding,
+  };
+};
+
+const projectToSvg = (point: LatLng, domain: ReturnType<typeof getProjectionDomain>) => {
+  const x = ((point.lng - domain.minLng) / (domain.maxLng - domain.minLng)) * 100;
+  const y = ((domain.maxLat - point.lat) / (domain.maxLat - domain.minLat)) * 100;
+  return { x: Number(x.toFixed(2)), y: Number(y.toFixed(2)) };
+};
+
+const toSvgPath = (points: LatLng[], domain: ReturnType<typeof getProjectionDomain>) =>
+  points.map((point, index) => {
+    const projected = projectToSvg(point, domain);
+    return `${index === 0 ? "M" : "L"}${projected.x} ${projected.y}`;
+  }).join(" ");
+
+const toSvgPolygon = (points: LatLng[], domain: ReturnType<typeof getProjectionDomain>) =>
+  points.map((point) => {
+    const projected = projectToSvg(point, domain);
+    return `${projected.x},${projected.y}`;
+  }).join(" ");
 
 function MapCanvas({ profile, layers, snapshot, activeFinding, compare, swipe, year, onFindingSelect, onSwipeChange }: MapCanvasProps) {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -99,6 +128,16 @@ function MapCanvas({ profile, layers, snapshot, activeFinding, compare, swipe, y
     if (!map || !window.google?.maps) return;
 
     const overlays: Array<{ setMap: (map: unknown | null) => void }> = [];
+    overlays.push(new window.google.maps.Polygon({
+      paths: profile.geometry.bounds,
+      strokeColor: "rgba(255,255,255,.9)",
+      strokeOpacity: 0.88,
+      strokeWeight: 2,
+      fillColor: "#ee5b45",
+      fillOpacity: 0.14,
+      map,
+    }));
+
     if (layer(layers, "zoning").enabled) {
       profile.geometry.zoningParcels.forEach((parcel) => overlays.push(new window.google!.maps.Polygon({
         paths: parcel.geometry,
@@ -132,6 +171,10 @@ function MapCanvas({ profile, layers, snapshot, activeFinding, compare, swipe, y
     return () => overlays.forEach((overlay) => overlay.setMap(null));
   }, [activeFinding, layers, map, profile, snapshot.businessIntensity]);
 
+  const projectionDomain = getProjectionDomain(profile);
+  const fallbackBusinessPath = toSvgPath(profile.geometry.businessDensityPath, projectionDomain);
+  const fallbackCorridorPoints = toSvgPolygon(profile.geometry.bounds, projectionDomain);
+
   return <section className="map-stage google-map-stage">
     <div ref={mapRef} className="google-map" aria-label={`${profile.city} Google Maps view`} />
     {loadState !== "ready" && <div className="map-config-warning">
@@ -147,9 +190,9 @@ function MapCanvas({ profile, layers, snapshot, activeFinding, compare, swipe, y
       {layer(layers, "demographics").enabled && <g opacity={layer(layers, "demographics").opacity / 180}>
         <rect x="72" width="28" height="100" fill="#d1b83d" /><rect width="32" height="100" fill="#4278a2" />
       </g>}
-      {layer(layers, "business").enabled && <path d={fallbackBusinessPath[profile.id]} fill="none" stroke="url(#heat)" strokeWidth={Math.max(7, snapshot.businessIntensity / 7)} strokeLinecap="round" opacity={layer(layers, "business").opacity / 100} />}
+      {layer(layers, "business").enabled && <path d={fallbackBusinessPath} fill="none" stroke="url(#heat)" strokeWidth={Math.max(7, snapshot.businessIntensity / 7)} strokeLinecap="round" opacity={layer(layers, "business").opacity / 100} />}
       <defs><linearGradient id="heat" x1="0" x2="1"><stop stopColor="#6c3e9f" /><stop offset=".46" stopColor="#d54f54" /><stop offset=".8" stopColor="#ff9d49" /><stop offset="1" stopColor="#ffe46a" /></linearGradient></defs>
-      <path className="corridor" d={fallbackCorridorPath[profile.id]} />
+      <polygon className="corridor" points={fallbackCorridorPoints} />
     </svg>
     {compare && <div className="swipe" style={{ left: `${swipe}%` }}><div className="before-after"><span>Before<br /><b>2012</b></span><span>After<br /><b>{year}</b></span></div><button>‹ ›</button></div>}
     <input className="swipe-range" aria-label="Before and after comparison divider" type="range" min="8" max="92" value={swipe} onChange={(event) => onSwipeChange(Number(event.target.value))} />
