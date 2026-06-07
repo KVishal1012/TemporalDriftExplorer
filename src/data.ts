@@ -173,9 +173,9 @@ const createSnapshots = (mode: "resilience" | "intensification"): TemporalSnapsh
 
 export const initialLayers: LayerState[] = [
   { id: "satellite", label: "Google Maps basemap", opacity: 100, enabled: true },
-  { id: "zoning", label: "Land-use zoning", opacity: 64, enabled: true },
+  { id: "zoning", label: "Land-use zoning", opacity: 48, enabled: false },
   { id: "business", label: "Business density", opacity: 72, enabled: true },
-  { id: "demographics", label: "Demographics", opacity: 52, enabled: true },
+  { id: "demographics", label: "Demographics", opacity: 42, enabled: false },
 ];
 
 export const cityProfiles: Record<CityKey, CityProfile> = {

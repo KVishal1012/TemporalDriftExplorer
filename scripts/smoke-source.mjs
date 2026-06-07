@@ -18,6 +18,8 @@ const required = [
   ["Google Maps env key", mapCanvas.includes("VITE_GOOGLE_MAPS_API_KEY")],
   ["Google Maps map surface", mapCanvas.includes("google.maps.Map")],
   ["Dynamic corridor projection", mapCanvas.includes("getProjectionDomain") && mapCanvas.includes("toSvgPolygon") && !mapCanvas.includes("fallbackCorridorPath")],
+  ["No live/fallback overlay stacking", mapCanvas.includes("showFallbackOverlays") && mapCanvas.includes('loadState !== "ready"')],
+  ["Full timeline simulation labels", app.includes("baselineYear") && app.includes("Run Simulation") && !app.includes("<b>2012</b>")],
   ["AlphaEarth dataset", data.includes("GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL")],
   ["AlphaEarth attribution", data.includes("The AlphaEarth Foundations Satellite Embedding dataset is produced by Google and Google DeepMind.")],
   ["AlphaEarth extraction plan", providers.includes("buildAlphaEarthExtractionPlan")],

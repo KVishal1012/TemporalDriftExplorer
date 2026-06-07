@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   BarChart3, Bookmark, CalendarDays, ChevronDown, ChevronLeft, ChevronRight,
   CircleHelp, Download, Layers3, Menu, MessageSquareText, Pause, Play, Search,
-  Settings, Share2, Sparkles, Users, X,
+  Settings, Sparkles, Users, X,
 } from "lucide-react";
 import { alphaEarthSummaries, cityProfiles, initialLayers, years, type CityKey, type EvidenceSeries, type LayerKey } from "./data";
 import MapCanvas from "./MapCanvas";
@@ -23,9 +23,11 @@ function Sparkline({ series }: { series: EvidenceSeries }) {
 }
 
 const humanizeStatus = (status: string) => status.replace(/-/g, " ");
+const baselineYear = years[0];
+const finalYear = years[years.length - 1];
 
 function App() {
-  const [year, setYear] = useState(2018);
+  const [year, setYear] = useState(finalYear);
   const [city, setCity] = useState<CityKey>("toronto");
   const [cityMenuOpen, setCityMenuOpen] = useState(false);
   const [layers, setLayers] = useState(initialLayers);
@@ -49,13 +51,15 @@ function App() {
 
   useEffect(() => {
     if (!playing) return;
-    const timer = window.setInterval(() => setYear((current) => current >= 2024 ? 2008 : current + 1), 850);
+    const timer = window.setInterval(() => setYear((current) => current >= finalYear ? baselineYear : current + 1), 850);
     return () => window.clearInterval(timer);
   }, [playing]);
 
   const layer = (id: LayerKey) => layers.find((item) => item.id === id)!;
   const toggleLayer = (id: LayerKey) => setLayers((current) => current.map((item) => item.id === id ? { ...item, enabled: !item.enabled } : item));
   const setOpacity = (id: LayerKey, opacity: number) => setLayers((current) => current.map((item) => item.id === id ? { ...item, opacity } : item));
+  const goPreviousYear = () => setYear((current) => current <= baselineYear ? finalYear : current - 1);
+  const goNextYear = () => setYear((current) => current >= finalYear ? baselineYear : current + 1);
   const runAnalysis = () => {
     setExplainer("loading");
     window.setTimeout(() => setExplainer("ready"), 900);
@@ -87,8 +91,8 @@ function App() {
         </div>}
       </div>
       <button className={`compare-toggle ${compare ? "active" : ""}`} onClick={() => setCompare(!compare)}>Compare Mode <span>{compare ? "ON" : "OFF"}</span></button>
-      <div className="year-compare"><ChevronLeft size={14} /> <b>2012</b><span>→</span><b>{year}</b><ChevronRight size={14} /></div>
-      <button className="top-action"><Share2 size={16} /> Share</button>
+      <div className="year-compare"><button onClick={goPreviousYear} aria-label="Previous year"><ChevronLeft size={14} /></button> <b>{baselineYear}</b><span>→</span><b>{year}</b><button onClick={goNextYear} aria-label="Next year"><ChevronRight size={14} /></button></div>
+      <button className="top-action" onClick={() => setPlaying(!playing)}>{playing ? <Pause size={16} /> : <Play size={16} />} {playing ? "Pause Simulation" : "Run Simulation"}</button>
       <button className="export"><Download size={16} /> Export <ChevronDown size={14} /></button>
     </header>
 
@@ -127,7 +131,7 @@ function App() {
 
       <button className="collapse-left" onClick={() => setLeftOpen(!leftOpen)}><ChevronLeft size={16} /></button>
 
-      <MapCanvas profile={profile} layers={layers} snapshot={snapshot} activeFinding={activeFinding} compare={compare} swipe={swipe} year={year} onFindingSelect={setActiveFinding} onSwipeChange={setSwipe} />
+      <MapCanvas profile={profile} layers={layers} snapshot={snapshot} activeFinding={activeFinding} compare={compare} swipe={swipe} year={year} baselineYear={baselineYear} onFindingSelect={setActiveFinding} onSwipeChange={setSwipe} />
 
       <button className="collapse-right" onClick={() => setRightOpen(!rightOpen)}><ChevronRight size={16} /></button>
       <aside className={`explainer ${rightOpen ? "" : "panel-hidden"}`}>
@@ -161,12 +165,12 @@ function App() {
       <div className="timeline-events">{profile.events.map((event) => <button key={event.year} className={`event ${event.tone}`} style={{ left: `${((event.year - 2008) / 16) * 100}%` }} onClick={() => setYear(event.year)}><span>{event.year}</span><em>{event.title}</em><i /></button>)}</div>
       <div className="timeline-bottom">
         <button className="play" onClick={() => setPlaying(!playing)}>{playing ? <Pause /> : <Play />}</button>
-        <button className="mini"><ChevronLeft /></button><button className="mini"><ChevronRight /></button>
+        <button className="mini" onClick={goPreviousYear} aria-label="Previous year"><ChevronLeft /></button><button className="mini" onClick={goNextYear} aria-label="Next year"><ChevronRight /></button>
         <span className="speed">1x <ChevronDown size={13} /></span>
         <div className="range-wrap"><input aria-label="Timeline year" type="range" min="2008" max="2024" value={year} onChange={(event) => setYear(Number(event.target.value))} /><div className="years">{years.map((item) => <span key={item}>{item}</span>)}</div></div>
         <button className="go-year"><CalendarDays size={16} /> Go to year</button>
       </div>
-      <div className="comparison">Comparison: <b>2012 → {year}</b><ChevronDown size={14} /></div>
+      <div className="comparison">Simulation: <b>{baselineYear} → {year}</b><span>{playing ? "Playing" : "Paused"}</span><ChevronDown size={14} /></div>
     </footer>
   </main>;
 }

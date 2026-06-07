@@ -23,6 +23,7 @@ interface MapCanvasProps {
   compare: boolean;
   swipe: number;
   year: number;
+  baselineYear: number;
   onFindingSelect: (id: number) => void;
   onSwipeChange: (value: number) => void;
 }
@@ -92,7 +93,7 @@ const toSvgPolygon = (points: LatLng[], domain: ReturnType<typeof getProjectionD
     return `${projected.x},${projected.y}`;
   }).join(" ");
 
-function MapCanvas({ profile, layers, snapshot, activeFinding, compare, swipe, year, onFindingSelect, onSwipeChange }: MapCanvasProps) {
+function MapCanvas({ profile, layers, snapshot, activeFinding, compare, swipe, year, baselineYear, onFindingSelect, onSwipeChange }: MapCanvasProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<Array<{ setMap: (map: unknown | null) => void }>>([]);
   const [map, setMap] = useState<unknown>(null);
@@ -160,6 +161,18 @@ function MapCanvas({ profile, layers, snapshot, activeFinding, compare, swipe, y
       }));
     }
 
+    if (layer(layers, "demographics").enabled) {
+      profile.geometry.demographicAreas.forEach((area, index) => overlays.push(new window.google!.maps.Polygon({
+        paths: area,
+        strokeColor: index === 0 ? "#66a9ce" : "#d2bf45",
+        strokeOpacity: 0.48,
+        strokeWeight: 1,
+        fillColor: index === 0 ? "#4278a2" : "#d1b83d",
+        fillOpacity: layer(layers, "demographics").opacity / 220,
+        map,
+      })));
+    }
+
     profile.findings.forEach((finding) => overlays.push(new window.google!.maps.Marker({
       position: finding.anchor,
       label: String(finding.id),
@@ -174,6 +187,7 @@ function MapCanvas({ profile, layers, snapshot, activeFinding, compare, swipe, y
   const projectionDomain = getProjectionDomain(profile);
   const fallbackBusinessPath = toSvgPath(profile.geometry.businessDensityPath, projectionDomain);
   const fallbackCorridorPoints = toSvgPolygon(profile.geometry.bounds, projectionDomain);
+  const showFallbackOverlays = loadState !== "ready";
 
   return <section className="map-stage google-map-stage">
     <div ref={mapRef} className="google-map" aria-label={`${profile.city} Google Maps view`} />
@@ -181,7 +195,7 @@ function MapCanvas({ profile, layers, snapshot, activeFinding, compare, swipe, y
       <strong>{loadState === "missing-key" ? "Google Maps key required" : loadState === "error" ? "Google Maps failed to load" : "Loading Google Maps"}</strong>
       <span>Set <code>VITE_GOOGLE_MAPS_API_KEY</code>{GOOGLE_MAP_ID ? "" : " and optionally VITE_GOOGLE_MAP_ID"} to render the live basemap.</span>
     </div>}
-    <svg className="map-overlays fallback-overlays" viewBox="0 0 100 100" preserveAspectRatio="none">
+    {showFallbackOverlays && <svg className="map-overlays fallback-overlays" viewBox="0 0 100 100" preserveAspectRatio="none">
       {layer(layers, "zoning").enabled && <g opacity={layer(layers, "zoning").opacity / 150}>
         <polygon points="8,8 33,5 32,42 5,45" fill="#df923e" stroke="rgba(255,255,255,.48)" strokeWidth=".22" />
         <polygon points="38,8 67,6 65,55 36,58" fill="#e8614e" stroke="rgba(255,255,255,.48)" strokeWidth=".22" />
@@ -193,9 +207,10 @@ function MapCanvas({ profile, layers, snapshot, activeFinding, compare, swipe, y
       {layer(layers, "business").enabled && <path d={fallbackBusinessPath} fill="none" stroke="url(#heat)" strokeWidth={Math.max(7, snapshot.businessIntensity / 7)} strokeLinecap="round" opacity={layer(layers, "business").opacity / 100} />}
       <defs><linearGradient id="heat" x1="0" x2="1"><stop stopColor="#6c3e9f" /><stop offset=".46" stopColor="#d54f54" /><stop offset=".8" stopColor="#ff9d49" /><stop offset="1" stopColor="#ffe46a" /></linearGradient></defs>
       <polygon className="corridor" points={fallbackCorridorPoints} />
-    </svg>
-    {compare && <div className="swipe" style={{ left: `${swipe}%` }}><div className="before-after"><span>Before<br /><b>2012</b></span><span>After<br /><b>{year}</b></span></div><button>‹ ›</button></div>}
+    </svg>}
+    {compare && <div className="swipe" style={{ left: `${swipe}%` }}><div className="before-after"><span>Before<br /><b>{baselineYear}</b></span><span>After<br /><b>{year}</b></span></div><button>‹ ›</button></div>}
     <input className="swipe-range" aria-label="Before and after comparison divider" type="range" min="8" max="92" value={swipe} onChange={(event) => onSwipeChange(Number(event.target.value))} />
+    <div className="year-badge">{year}</div>
     {profile.findings.map((finding) => <button key={finding.id} style={{ left: `${finding.position.x}%`, top: `${finding.position.y}%` }} onClick={() => onFindingSelect(finding.id)} className={`map-pin ${activeFinding === finding.id ? "pin-active" : ""}`}>{finding.id}</button>)}
     <div className="map-label label-one">{profile.labels[0]}</div><div className="map-label label-two">{profile.labels[1]}</div><div className="map-label label-three">{profile.labels[2]}</div>
     <div className="map-tools"><button>+</button><button>−</button><button>⌖</button><button className="map-3d">3D</button></div>
