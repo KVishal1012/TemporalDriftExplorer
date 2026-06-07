@@ -137,12 +137,14 @@ The current API is JSON-backed by the same typed city profiles used by the front
 - `GET /api/cities/toronto/snapshots`
 - `GET /api/cities/toronto/layers`
 - `GET /api/cities/toronto/sources`
+- `GET /api/cities/toronto/datasets`
 - `GET /api/cities/toronto/alphaearth`
 - `GET /api/cities/toronto/explain`
 - `GET /api/cities/chennai/profile`
 - `GET /api/cities/chennai/snapshots`
 - `GET /api/cities/chennai/layers`
 - `GET /api/cities/chennai/sources`
+- `GET /api/cities/chennai/datasets`
 - `GET /api/cities/chennai/alphaearth`
 - `GET /api/cities/chennai/explain`
 - `GET /api/integrations`
@@ -158,6 +160,15 @@ The UI now distinguishes source types:
 - `alphaearth-embedding`: AlphaEarth Foundations Satellite Embedding V1 Annual metadata.
 - `seeded-fallback`: temporary demo values that must not be treated as real measurements.
 
+The Phase 1 truth boundary is explicit in the app:
+
+- Real: Google Maps basemap tiles, when `VITE_GOOGLE_MAPS_API_KEY` is configured.
+- Configured: official civic source contracts and provider URLs.
+- Seeded: current year-by-year simulation values, zoning polygons, business density, demographics, evidence charts, and explainer findings.
+- Pending: TimescaleDB row ingestion and AlphaEarth extraction.
+
+The Phase 2 dataset boundary is also explicit. `GET /api/cities/:cityId/datasets` returns official source contracts with `loadedRows: 0` until real data has been fetched server-side, clipped to the corridor, validated, and written to TimescaleDB. For Toronto, the first configured source contract is the City of Toronto Open Data Zoning By-law package for the King Street West corridor. This repository does not bundle the large civic dataset yet.
+
 AlphaEarth attribution: “The AlphaEarth Foundations Satellite Embedding dataset is produced by Google and Google DeepMind.”
 
 The previous generated corridor JPEG backdrops have been removed. The map surface now attempts to load Google Maps when `VITE_GOOGLE_MAPS_API_KEY` is configured. Without a key, the app keeps working with the code-native corridor overlays and displays a configuration notice instead of pretending that synthetic imagery is real.
@@ -165,7 +176,8 @@ The previous generated corridor JPEG backdrops have been removed. The map surfac
 The next alpha boundary is now explicit:
 
 - Toronto and Chennai each have a source-metadata-ready civic ingestion target.
-- `/api/cities/:cityId/sources` separates source-metadata layer rows from fallback layer rows.
+- `/api/cities/:cityId/sources` separates source contracts, loaded live rows, and fallback layer rows.
+- `/api/cities/:cityId/datasets` exposes official dataset contracts without claiming rows are loaded.
 - `/api/cities/:cityId/alphaearth` returns the server-only AlphaEarth extraction plan.
 - `/api/timescale/schema` returns the TimescaleDB schema needed to replace seeded snapshots and layer observations.
 

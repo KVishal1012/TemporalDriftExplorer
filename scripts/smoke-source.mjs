@@ -7,6 +7,7 @@ const mapCanvas = readFileSync("src/MapCanvas.tsx", "utf8");
 const providers = readFileSync("src/providers.ts", "utf8");
 const schema = readFileSync("db/timescale_schema.sql", "utf8");
 const envExample = readFileSync(".env.example", "utf8");
+const datasetApi = readFileSync("api/cities/[cityId]/datasets.ts", "utf8");
 
 const required = [
   ["Toronto profile", data.includes('city: "Toronto"')],
@@ -20,12 +21,16 @@ const required = [
   ["Dynamic corridor projection", mapCanvas.includes("getProjectionDomain") && mapCanvas.includes("toSvgPolygon") && !mapCanvas.includes("fallbackCorridorPath")],
   ["No live/fallback overlay stacking", mapCanvas.includes("showFallbackOverlays") && mapCanvas.includes('loadState !== "ready"')],
   ["Full timeline simulation labels", app.includes("baselineYear") && app.includes("Run Simulation") && !app.includes("<b>2012</b>")],
+  ["Data truth status UI", app.includes("Data status") && app.includes("loaded live civic rows") && app.includes("source contracts")],
+  ["Seeded zoning guardrail", data.includes("truthLabels") && data.includes('provenance: "seeded-fallback" as const')],
+  ["Toronto zoning source contract", data.includes("toronto-zoning-by-law") && data.includes("loadedRows: 0") && data.includes("https://open.toronto.ca/dataset/zoning-by-law/")],
+  ["Dataset contract endpoint", datasetApi.includes("civicDatasetContracts") && datasetApi.includes("loadedRows") && datasetApi.includes("guardrail")],
   ["AlphaEarth dataset", data.includes("GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL")],
   ["AlphaEarth attribution", data.includes("The AlphaEarth Foundations Satellite Embedding dataset is produced by Google and Google DeepMind.")],
   ["AlphaEarth extraction plan", providers.includes("buildAlphaEarthExtractionPlan")],
   ["Timescale schema", schema.includes("create_hypertable") && schema.includes("temporal.alphaearth_embeddings")],
   ["Server-only AlphaEarth env", envExample.includes("EARTH_ENGINE_SERVICE_ACCOUNT") && envExample.includes("GOOGLE_APPLICATION_CREDENTIALS_JSON")],
-  ["Source readiness endpoint docs", readme.includes("/api/cities/toronto/sources") && readme.includes("/api/integrations")],
+  ["Source readiness endpoint docs", readme.includes("/api/cities/toronto/sources") && readme.includes("/api/cities/toronto/datasets") && readme.includes("/api/integrations")],
   ["No primary synthetic image map", !app.includes("profile.asset") && !app.includes("<img className=\"map-image\"")],
   ["README launch markets", readme.includes("Launch Markets")],
 ];

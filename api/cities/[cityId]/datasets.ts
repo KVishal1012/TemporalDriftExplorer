@@ -1,5 +1,4 @@
-import { cityProfiles, layerObservations, type CityKey } from "../../../src/data.js";
-import { getCitySourceReadiness } from "../../../src/providers.js";
+import { civicDatasetContracts, cityProfiles, type CityKey } from "../../../src/data.js";
 
 export const config = { runtime: "edge" };
 
@@ -21,17 +20,13 @@ export default function handler(request: Request) {
     }), { status: 404, headers });
   }
 
-  const readiness = getCitySourceReadiness(cityId);
+  const datasets = civicDatasetContracts.filter((dataset) => dataset.cityId === cityId);
 
   return new Response(JSON.stringify({
     cityId,
     corridor: profile.corridor,
-    sources: profile.sources,
-    observations: layerObservations.filter((observation) => observation.cityId === cityId),
-    loadedSourceObservations: readiness.loadedSourceObservations,
-    fallbackObservations: readiness.fallbackObservations,
-    liveRowsLoaded: readiness.liveRowsLoaded,
-    civicDatasets: readiness.civicDatasets,
-    ingestionTargets: readiness.ingestionTargets,
+    datasets,
+    loadedRows: datasets.reduce((total, dataset) => total + dataset.loadedRows, 0),
+    guardrail: "Dataset contracts can reference official sources before ingestion, but loadedRows must stay 0 until real rows are fetched and clipped server-side.",
   }), { headers });
 }

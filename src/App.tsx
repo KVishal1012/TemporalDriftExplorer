@@ -25,6 +25,7 @@ function Sparkline({ series }: { series: EvidenceSeries }) {
 const humanizeStatus = (status: string) => status.replace(/-/g, " ");
 const baselineYear = years[0];
 const finalYear = years[years.length - 1];
+const truthClass = (status: string) => status === "real" ? "status-ok" : status === "seeded" ? "status-seeded" : "status-waiting";
 
 function App() {
   const [year, setYear] = useState(finalYear);
@@ -120,6 +121,14 @@ function App() {
           <div className="density-gradient" /><div className="gradient-labels"><span>Low</span><span>High</span></div>
         </div>
         <div className="readiness-card">
+          <div className="panel-title">Data status <ChevronDown size={15} /></div>
+          {sourceReadiness.truthLabels.map((item) => <div className="readiness-row" key={item.id}>
+            <strong>{item.label}</strong>
+            <span className={truthClass(item.status)}>{item.status}</span>
+            <p>{item.detail}</p>
+          </div>)}
+        </div>
+        <div className="readiness-card">
           <div className="panel-title">Integration readiness <ChevronDown size={15} /></div>
           {integrationReadiness.map((item) => <div className="readiness-row" key={item.id}>
             <strong>{item.label}</strong>
@@ -153,9 +162,15 @@ function App() {
           {profile.sources.map((source) => <span key={source.id}>{source.name}: {humanizeStatus(source.status)}</span>)}
         </div>
         <div className="source-metrics">
-          <span><b>{sourceReadiness.sourceMetadataObservations.length}</b> source-metadata layer rows</span>
+          <span><b>{sourceReadiness.liveRowsLoaded}</b> loaded live civic rows</span>
           <span><b>{sourceReadiness.fallbackObservations.length}</b> fallback layer rows</span>
-          <span><b>{sourceReadiness.ingestionTargets.length}</b> Timescale ingestion target</span>
+          <span><b>{sourceReadiness.civicDatasets.length}</b> source contracts</span>
+        </div>
+        <div className="dataset-list">
+          {sourceReadiness.civicDatasets.map((dataset) => <a key={dataset.id} href={dataset.officialPortalUrl} target="_blank" rel="noreferrer">
+            <strong>{dataset.name}</strong>
+            <span>{dataset.loadedRows} rows loaded · {humanizeStatus(dataset.status)}</span>
+          </a>)}
         </div>
         <div className="ai-note">{alphaEarth.attribution} Current AlphaEarth status: {humanizeStatus(alphaEarth.status)}.</div>
       </aside>

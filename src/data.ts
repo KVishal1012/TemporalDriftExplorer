@@ -2,6 +2,7 @@ export type LayerKey = "satellite" | "zoning" | "business" | "demographics";
 export type CityKey = "toronto" | "chennai";
 export type ProvenanceKind = "live-civic-data" | "alphaearth-embedding" | "seeded-fallback";
 export type SourceStatus = "source-metadata-ready" | "pending-live-ingestion";
+export type TruthStatus = "real" | "configured" | "seeded" | "pending";
 
 export interface LatLng {
   lat: number;
@@ -99,6 +100,43 @@ export interface CivicIngestionTarget {
   nextAction: string;
 }
 
+export interface CivicDatasetResource {
+  id: string;
+  label: string;
+  format: "geojson" | "geopackage" | "csv" | "api" | "web";
+  url: string;
+  status: SourceStatus;
+}
+
+export interface CivicDatasetContract {
+  id: string;
+  cityId: CityKey;
+  sourceId: string;
+  name: string;
+  provider: string;
+  country: "Canada" | "India";
+  corridor: string;
+  officialPortalUrl: string;
+  packageId?: string;
+  layer: Exclude<LayerKey, "satellite">;
+  targetTable: string;
+  loadedRows: number;
+  loadedYears: number[];
+  status: SourceStatus;
+  resources: CivicDatasetResource[];
+  nextAction: string;
+  truthStatus: TruthStatus;
+  notes: string;
+}
+
+export interface DataTruthLabel {
+  id: string;
+  label: string;
+  status: TruthStatus;
+  sourceId?: string;
+  detail: string;
+}
+
 export interface AlphaEarthEmbeddingSummary {
   datasetId: "GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL";
   sourceId: "alphaearth-foundations";
@@ -125,6 +163,7 @@ export interface CityProfile {
   findings: SpatialFinding[];
   evidence: EvidenceSeries[];
   sources: RealDataSource[];
+  truthLabels: DataTruthLabel[];
 }
 
 export const years = Array.from({ length: 17 }, (_, index) => 2008 + index);
@@ -223,10 +262,16 @@ export const cityProfiles: Record<CityKey, CityProfile> = {
       { label: "Residential index", startValue: "100", endValue: "126", sourceId: "statistics-canada", color: "#8a50aa", values: [100, 102, 104, 105, 108, 110, 112, 114, 116, 118, 120, 122, 124, 126], provenance: "seeded-fallback" },
     ],
     sources: [
-      { id: "toronto-open-data", name: "Toronto Open Data", provider: "City of Toronto", country: "Canada", status: "source-metadata-ready", yearRange: "varies by dataset", url: "https://open.toronto.ca/", ingestionTarget: "timescale-layer", notes: "Source slot for parcel, zoning, business, and corridor civic layers.", provenance: "live-civic-data" },
+      { id: "toronto-open-data", name: "Toronto Open Data", provider: "City of Toronto", country: "Canada", status: "source-metadata-ready", yearRange: "varies by dataset", url: "https://open.toronto.ca/", ingestionTarget: "timescale-layer", notes: "Official civic source metadata is configured; no Toronto Open Data rows are bundled in this build.", provenance: "live-civic-data" },
       { id: "ttc-open-data", name: "TTC Open Data", provider: "Toronto Transit Commission", country: "Canada", status: "source-metadata-ready", yearRange: "varies by dataset", url: "https://open.toronto.ca/catalogue/?search=ttc", ingestionTarget: "evidence-series", notes: "Source slot for transit-adjacent mobility and access signals.", provenance: "live-civic-data" },
       { id: "statistics-canada", name: "Statistics Canada", provider: "Government of Canada", country: "Canada", status: "source-metadata-ready", yearRange: "2016-2021+", url: "https://www.statcan.gc.ca/", ingestionTarget: "evidence-series", notes: "Source slot for demographic and household observations.", provenance: "live-civic-data" },
       alphaEarthSource,
+    ],
+    truthLabels: [
+      { id: "toronto-google-basemap", label: "Google Maps basemap", status: "real", sourceId: "google-maps", detail: "Live Google map tiles render when the Vercel browser API key is available." },
+      { id: "toronto-zoning-contract", label: "Toronto zoning source", status: "configured", sourceId: "toronto-open-data", detail: "Official Toronto Open Data zoning metadata is wired for ingestion; corridor rows are not loaded yet." },
+      { id: "toronto-simulation", label: "Timeline simulation", status: "seeded", detail: "Yearly vacancy, business-density, zoning polygons, and explainer evidence remain seeded fallback values." },
+      { id: "toronto-alphaearth", label: "AlphaEarth embeddings", status: "pending", sourceId: "alphaearth-foundations", detail: "Dataset contract is present, but Earth Engine or Google Cloud credentials must run server-side extraction." },
     ],
   },
   chennai: {
@@ -277,8 +322,79 @@ export const cityProfiles: Record<CityKey, CityProfile> = {
       { id: "cmrl-open-data", name: "CMRL transit datasets", provider: "Chennai Metro Rail Limited", country: "India", status: "source-metadata-ready", yearRange: "varies by dataset", url: "https://chennaimetrorail.org/", ingestionTarget: "evidence-series", notes: "Source slot for metro access and transit-adjacent corridor signals.", provenance: "live-civic-data" },
       alphaEarthSource,
     ],
+    truthLabels: [
+      { id: "chennai-google-basemap", label: "Google Maps basemap", status: "real", sourceId: "google-maps", detail: "Live Google map tiles render when the Vercel browser API key is available." },
+      { id: "chennai-planning-contract", label: "CMDA planning source", status: "configured", sourceId: "cmda-planning", detail: "Official planning-source boundary is documented; corridor rows are not loaded yet." },
+      { id: "chennai-simulation", label: "Timeline simulation", status: "seeded", detail: "Yearly vacancy, business-density, zoning polygons, and explainer evidence remain seeded fallback values." },
+      { id: "chennai-alphaearth", label: "AlphaEarth embeddings", status: "pending", sourceId: "alphaearth-foundations", detail: "Dataset contract is present, but Earth Engine or Google Cloud credentials must run server-side extraction." },
+    ],
   },
 };
+
+export const civicDatasetContracts: CivicDatasetContract[] = [
+  {
+    id: "toronto-zoning-by-law",
+    cityId: "toronto",
+    sourceId: "toronto-open-data",
+    name: "Zoning By-law",
+    provider: "City of Toronto Open Data",
+    country: "Canada",
+    corridor: "King Street West",
+    officialPortalUrl: "https://open.toronto.ca/dataset/zoning-by-law/",
+    packageId: "34927e44-fc11-4336-a8aa-a0dfb27658b7",
+    layer: "zoning",
+    targetTable: "temporal.layer_observations",
+    loadedRows: 0,
+    loadedYears: [],
+    status: "source-metadata-ready",
+    truthStatus: "configured",
+    resources: [
+      {
+        id: "toronto-zoning-readme",
+        label: "Zoning readme",
+        format: "web",
+        url: "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/34927e44-fc11-4336-a8aa-a0dfb27658b7/resource/aa11a6f1-17fd-49b7-bbe4-f381bbc36f94/download/Zoning_readme.txt",
+        status: "source-metadata-ready",
+      },
+      {
+        id: "toronto-zoning-geojson",
+        label: "Zoning area GeoJSON resource",
+        format: "geojson",
+        url: "https://open.toronto.ca/dataset/zoning-by-law/",
+        status: "pending-live-ingestion",
+      },
+    ],
+    nextAction: "Fetch the official GeoJSON or GeoPackage resource server-side, clip it to King Street West, then write parcel rows to TimescaleDB.",
+    notes: "This contract records the authoritative source and ingestion target only. The current visible corridor polygons are still compact seeded fallback geometry.",
+  },
+  {
+    id: "chennai-planning-land-use",
+    cityId: "chennai",
+    sourceId: "cmda-planning",
+    name: "CMDA land-use and planning layers",
+    provider: "Chennai Metropolitan Development Authority",
+    country: "India",
+    corridor: "Anna Salai",
+    officialPortalUrl: "https://cmdachennai.gov.in/",
+    layer: "zoning",
+    targetTable: "temporal.layer_observations",
+    loadedRows: 0,
+    loadedYears: [],
+    status: "source-metadata-ready",
+    truthStatus: "configured",
+    resources: [
+      {
+        id: "cmda-planning-portal",
+        label: "CMDA planning portal",
+        format: "web",
+        url: "https://cmdachennai.gov.in/",
+        status: "source-metadata-ready",
+      },
+    ],
+    nextAction: "Confirm export permissions and file format, normalize land-use categories, and clip planning polygons to Anna Salai.",
+    notes: "This is a source contract only; no CMDA parcel rows are bundled in the repository.",
+  },
+];
 
 export const civicIngestionTargets: CivicIngestionTarget[] = [
   {
@@ -313,7 +429,7 @@ export const layerObservations: LayerObservation[] = Object.values(cityProfiles)
     label: parcel.use,
     yearRange: "2012-2024",
     sourceId: profile.sources[0].id,
-    provenance: "live-civic-data" as const,
+    provenance: "seeded-fallback" as const,
     geometry: parcel.geometry,
     value: parcel.use,
   })),

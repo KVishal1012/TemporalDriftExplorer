@@ -1,9 +1,12 @@
 import {
   alphaEarthSummaries,
+  civicDatasetContracts,
   civicIngestionTargets,
   cityProfiles,
   layerObservations,
   type CityKey,
+  type CivicDatasetContract,
+  type DataTruthLabel,
   type LayerObservation,
   type RealDataSource,
 } from "./data.js";
@@ -23,9 +26,12 @@ export interface CitySourceReadiness {
   cityId: CityKey;
   corridor: string;
   sources: RealDataSource[];
+  civicDatasets: CivicDatasetContract[];
   ingestionTargets: typeof civicIngestionTargets;
-  sourceMetadataObservations: LayerObservation[];
+  loadedSourceObservations: LayerObservation[];
   fallbackObservations: LayerObservation[];
+  truthLabels: DataTruthLabel[];
+  liveRowsLoaded: number;
 }
 
 export interface AlphaEarthExtractionPlan {
@@ -94,9 +100,12 @@ export const getCitySourceReadiness = (cityId: CityKey): CitySourceReadiness => 
     cityId,
     corridor: profile.corridor,
     sources: profile.sources,
+    civicDatasets: civicDatasetContracts.filter((dataset) => dataset.cityId === cityId),
     ingestionTargets: civicIngestionTargets.filter((target) => target.cityId === cityId),
-    sourceMetadataObservations: cityObservations.filter((observation) => observation.provenance === "live-civic-data"),
+    loadedSourceObservations: cityObservations.filter((observation) => observation.provenance === "live-civic-data"),
     fallbackObservations: cityObservations.filter((observation) => observation.provenance === "seeded-fallback"),
+    truthLabels: profile.truthLabels,
+    liveRowsLoaded: cityObservations.filter((observation) => observation.provenance === "live-civic-data").length,
   };
 };
 
