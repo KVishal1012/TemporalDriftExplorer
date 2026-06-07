@@ -52,14 +52,31 @@ create table if not exists temporal.layer_observations (
   city_id text not null references temporal.cities(id),
   corridor_id text not null references temporal.corridors(id),
   layer text not null,
+  label text,
+  year_range text,
   observed_at timestamptz not null,
   source_id text references temporal.sources(id),
+  dataset_id text,
   provenance text not null,
   value text not null,
   geometry_geojson jsonb not null,
+  properties jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now(),
   primary key (id, observed_at)
 );
 select create_hypertable('temporal.layer_observations', 'observed_at', if_not_exists => true);
+
+alter table temporal.layer_observations add column if not exists label text;
+alter table temporal.layer_observations add column if not exists year_range text;
+alter table temporal.layer_observations add column if not exists dataset_id text;
+alter table temporal.layer_observations add column if not exists properties jsonb not null default '{}'::jsonb;
+alter table temporal.layer_observations add column if not exists updated_at timestamptz not null default now();
+
+create index if not exists layer_observations_city_layer_time_idx
+  on temporal.layer_observations (city_id, layer, observed_at desc);
+
+create index if not exists layer_observations_dataset_idx
+  on temporal.layer_observations (dataset_id);
 
 create table if not exists temporal.alphaearth_embeddings (
   city_id text not null references temporal.cities(id),
@@ -89,4 +106,3 @@ create table if not exists temporal.spatial_findings (
   provenance text not null,
   created_at timestamptz not null default now()
 );`;
-

@@ -4,7 +4,17 @@ import {
   CircleHelp, Download, Layers3, Menu, MessageSquareText, Pause, Play, Search,
   Settings, Sparkles, Users, X,
 } from "lucide-react";
-import { alphaEarthSummaries, cityProfiles, initialLayers, years, type CityKey, type EvidenceSeries, type LayerKey } from "./data";
+import {
+  alphaEarthSummaries,
+  cityProfiles,
+  initialLayers,
+  years,
+  type CityKey,
+  type CivicDatasetContract,
+  type EvidenceSeries,
+  type LayerKey,
+  type LayerObservation,
+} from "./data";
 import MapCanvas from "./MapCanvas";
 import { getCitySourceReadiness, getIntegrationReadiness } from "./providers";
 
@@ -27,6 +37,22 @@ const baselineYear = years[0];
 const finalYear = years[years.length - 1];
 const truthClass = (status: string) => status === "real" ? "status-ok" : status === "seeded" ? "status-seeded" : "status-waiting";
 
+interface LayerApiState {
+  loadedSourceObservations: LayerObservation[];
+  liveRowsLoaded: number;
+  civicDatasets: CivicDatasetContract[];
+  readMode: "timescale-live" | "seeded-fallback" | string;
+}
+
+const zoningColor = (label: string) => {
+  if (label.includes("Commercial")) return "#e8614e";
+  if (label.includes("Mixed")) return "#df923e";
+  if (label.includes("Residential")) return "#d4b637";
+  if (label.includes("Industrial") || label.includes("Employment")) return "#755ca6";
+  if (label.includes("Open")) return "#67965f";
+  return "#4671ad";
+};
+
 function App() {
   const [year, setYear] = useState(finalYear);
   const [city, setCity] = useState<CityKey>("toronto");
@@ -39,6 +65,7 @@ function App() {
   const [explainer, setExplainer] = useState<"idle" | "loading" | "ready">("ready");
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
+  const [layerApi, setLayerApi] = useState<LayerApiState | null>(null);
 
   const profile = cityProfiles[city];
   const snapshot = useMemo(() => profile.snapshots.find((item) => item.year === year)!, [profile, year]);
@@ -55,6 +82,40 @@ function App() {
     const timer = window.setInterval(() => setYear((current) => current >= finalYear ? baselineYear : current + 1), 850);
     return () => window.clearInterval(timer);
   }, [playing]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLayerApi(null);
+    fetch(`/api/cities/${city}/layers`, { signal: controller.signal })
+      .then((response) => response.ok ? response.json() : null)
+      .then((payload: LayerApiState | null) => {
+        if (payload) setLayerApi(payload);
+      })
+      .catch((error) => {
+        if ((error as Error).name !== "AbortError") setLayerApi(null);
+      });
+    return () => controller.abort();
+  }, [city]);
+
+  const liveZoningRows = layerApi?.loadedSourceObservations.filter((observation) => observation.layer === "zoning") ?? [];
+  const mapProfile = useMemo(() => {
+    if (liveZoningRows.length === 0) return profile;
+    return {
+      ...profile,
+      geometry: {
+        ...profile.geometry,
+        zoningParcels: liveZoningRows.map((observation) => ({
+          id: observation.id,
+          use: observation.label,
+          color: zoningColor(observation.label),
+          geometry: observation.geometry,
+        })),
+      },
+    };
+  }, [liveZoningRows, profile]);
+  const civicDatasets = layerApi?.civicDatasets ?? sourceReadiness.civicDatasets;
+  const liveRowsLoaded = layerApi?.liveRowsLoaded ?? sourceReadiness.liveRowsLoaded;
+  const readMode = layerApi?.readMode ?? "seeded-fallback";
 
   const layer = (id: LayerKey) => layers.find((item) => item.id === id)!;
   const toggleLayer = (id: LayerKey) => setLayers((current) => current.map((item) => item.id === id ? { ...item, enabled: !item.enabled } : item));
@@ -140,7 +201,7 @@ function App() {
 
       <button className="collapse-left" onClick={() => setLeftOpen(!leftOpen)}><ChevronLeft size={16} /></button>
 
-      <MapCanvas profile={profile} layers={layers} snapshot={snapshot} activeFinding={activeFinding} compare={compare} swipe={swipe} year={year} baselineYear={baselineYear} onFindingSelect={setActiveFinding} onSwipeChange={setSwipe} />
+      <MapCanvas profile={mapProfile} layers={layers} snapshot={snapshot} activeFinding={activeFinding} compare={compare} swipe={swipe} year={year} baselineYear={baselineYear} onFindingSelect={setActiveFinding} onSwipeChange={setSwipe} />
 
       <button className="collapse-right" onClick={() => setRightOpen(!rightOpen)}><ChevronRight size={16} /></button>
       <aside className={`explainer ${rightOpen ? "" : "panel-hidden"}`}>
@@ -162,12 +223,13 @@ function App() {
           {profile.sources.map((source) => <span key={source.id}>{source.name}: {humanizeStatus(source.status)}</span>)}
         </div>
         <div className="source-metrics">
-          <span><b>{sourceReadiness.liveRowsLoaded}</b> loaded live civic rows</span>
+          <span><b>{liveRowsLoaded}</b> loaded live civic rows</span>
           <span><b>{sourceReadiness.fallbackObservations.length}</b> fallback layer rows</span>
-          <span><b>{sourceReadiness.civicDatasets.length}</b> source contracts</span>
+          <span><b>{civicDatasets.length}</b> source contracts</span>
         </div>
+        <div className="read-mode">Layer API: {humanizeStatus(readMode)}</div>
         <div className="dataset-list">
-          {sourceReadiness.civicDatasets.map((dataset) => <a key={dataset.id} href={dataset.officialPortalUrl} target="_blank" rel="noreferrer">
+          {civicDatasets.map((dataset) => <a key={dataset.id} href={dataset.officialPortalUrl} target="_blank" rel="noreferrer">
             <strong>{dataset.name}</strong>
             <span>{dataset.loadedRows} rows loaded · {humanizeStatus(dataset.status)}</span>
           </a>)}

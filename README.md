@@ -86,6 +86,8 @@ Configure server-only integration credentials when moving beyond the fallback de
 
 ```bash
 TIMESCALE_DATABASE_URL=postgresql://...
+INGEST_API_TOKEN=replace_with_a_long_random_token
+TORONTO_ZONING_MAX_FEATURES=500
 GOOGLE_APPLICATION_CREDENTIALS_JSON=...
 EARTH_ENGINE_SERVICE_ACCOUNT=...
 EARTH_ENGINE_PRIVATE_KEY=...
@@ -103,6 +105,8 @@ src/MapCanvas.tsx                      Native Google Maps JavaScript API map sur
 src/styles.css                         Desktop and tablet visual system
 src/providers.ts                       Integration readiness, source split, and AlphaEarth extraction contracts
 src/timescaleSchema.ts                 API-exportable TimescaleDB schema
+src/server/timescale.ts                TimescaleDB read/write helper
+src/server/torontoZoningIngestion.ts   Toronto Open Data zoning ingestion service
 db/timescale_schema.sql                Database setup draft for the source-backed alpha
 api/cities.ts                          JSON-backed launch city listing
 api/cities/[cityId]/profile.ts         City profile endpoint
@@ -111,6 +115,7 @@ api/cities/[cityId]/layers.ts          Layer observations and source metadata
 api/cities/[cityId]/alphaearth.ts      AlphaEarth Foundations metadata endpoint
 api/cities/[cityId]/sources.ts         City source readiness endpoint
 api/cities/[cityId]/explain.ts         Retrieval-shaped explainer payload endpoint
+api/ingest/toronto/zoning.ts           Token-gated Toronto zoning ingestion endpoint
 api/integrations.ts                    Google Maps, TimescaleDB, and AlphaEarth readiness endpoint
 api/timescale/schema.ts                TimescaleDB SQL schema endpoint
 ```
@@ -149,8 +154,25 @@ The current API is JSON-backed by the same typed city profiles used by the front
 - `GET /api/cities/chennai/explain`
 - `GET /api/integrations`
 - `GET /api/timescale/schema`
+- `POST /api/ingest/toronto/zoning`
 
 Unsupported cities return a message that Temporal Drift Explorer currently supports Toronto and Chennai only.
+
+## Toronto Zoning Ingestion
+
+The first real-data path is Toronto Open Data Zoning By-law ingestion for King Street West:
+
+1. Configure `TIMESCALE_DATABASE_URL` on the server.
+2. Configure `INGEST_API_TOKEN` with a long random secret.
+3. Run the schema from `db/timescale_schema.sql` or let the ingestion endpoint call the same migration-safe SQL.
+4. Call:
+
+```bash
+curl -X POST "https://your-deployment.vercel.app/api/ingest/toronto/zoning?maxFeatures=500" \
+  -H "Authorization: Bearer $INGEST_API_TOKEN"
+```
+
+The endpoint discovers the current CKAN GeoJSON cache for Toronto `Zoning Area`, filters features intersecting the configured King Street West corridor, stores matching rows in `temporal.layer_observations`, and marks them as `live-civic-data`. `GET /api/cities/toronto/layers` then prefers Timescale rows over seeded fallback observations. The React map also calls that endpoint and will render live zoning parcels when rows exist.
 
 ## Data Provenance
 
@@ -167,7 +189,7 @@ The Phase 1 truth boundary is explicit in the app:
 - Seeded: current year-by-year simulation values, zoning polygons, business density, demographics, evidence charts, and explainer findings.
 - Pending: TimescaleDB row ingestion and AlphaEarth extraction.
 
-The Phase 2 dataset boundary is also explicit. `GET /api/cities/:cityId/datasets` returns official source contracts with `loadedRows: 0` until real data has been fetched server-side, clipped to the corridor, validated, and written to TimescaleDB. For Toronto, the first configured source contract is the City of Toronto Open Data Zoning By-law package for the King Street West corridor. This repository does not bundle the large civic dataset yet.
+The Phase 2 dataset boundary is also explicit. `GET /api/cities/:cityId/datasets` returns official source contracts with `loadedRows: 0` until real data has been fetched server-side, corridor-filtered, validated, and written to TimescaleDB. For Toronto, the first implemented source contract is the City of Toronto Open Data Zoning By-law package for the King Street West corridor. This repository does not bundle the large civic dataset; ingestion fetches it from the official CKAN resource at runtime.
 
 AlphaEarth attribution: “The AlphaEarth Foundations Satellite Embedding dataset is produced by Google and Google DeepMind.”
 
@@ -177,7 +199,8 @@ The next alpha boundary is now explicit:
 
 - Toronto and Chennai each have a source-metadata-ready civic ingestion target.
 - `/api/cities/:cityId/sources` separates source contracts, loaded live rows, and fallback layer rows.
-- `/api/cities/:cityId/datasets` exposes official dataset contracts without claiming rows are loaded.
+- `/api/cities/:cityId/datasets` exposes official dataset contracts and reflects Timescale row counts when rows are loaded.
+- `/api/ingest/toronto/zoning` fetches real Toronto Open Data zoning features and writes corridor matches to TimescaleDB.
 - `/api/cities/:cityId/alphaearth` returns the server-only AlphaEarth extraction plan.
 - `/api/timescale/schema` returns the TimescaleDB schema needed to replace seeded snapshots and layer observations.
 
