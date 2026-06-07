@@ -60,7 +60,7 @@ export const getEnv = (): EnvMap => {
 
 export const getIntegrationReadiness = (env: EnvMap = getEnv()): IntegrationReadiness[] => {
   const mapsConfigured = hasAny(env, ["VITE_GOOGLE_MAPS_API_KEY"]);
-  const timescaleConfigured = hasAny(env, ["TIMESCALE_DATABASE_URL", "DATABASE_URL"]);
+  const timescaleConfigured = hasAny(env, ["TIMESCALE_DATABASE_URL"]);
   const alphaEarthConfigured = hasAll(env, ["EARTH_ENGINE_SERVICE_ACCOUNT", "EARTH_ENGINE_PRIVATE_KEY"])
     || hasAny(env, ["GOOGLE_APPLICATION_CREDENTIALS_JSON"]);
 
@@ -78,7 +78,7 @@ export const getIntegrationReadiness = (env: EnvMap = getEnv()): IntegrationRead
       label: "TimescaleDB temporal store",
       status: timescaleConfigured ? "configured" : "missing-env",
       requiredEnv: ["TIMESCALE_DATABASE_URL"],
-      optionalEnv: ["DATABASE_URL"],
+      optionalEnv: [],
       message: timescaleConfigured ? "Temporal database URL is present for server-side ingestion." : "Set a server-side TimescaleDB URL before replacing seeded snapshots.",
     },
     {

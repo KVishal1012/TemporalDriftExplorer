@@ -27,7 +27,7 @@ const getEnv = (): EnvMap => {
   return processEnv ?? {};
 };
 
-export const getTimescaleDatabaseUrl = (env: EnvMap = getEnv()) => env.TIMESCALE_DATABASE_URL ?? env.DATABASE_URL;
+export const getTimescaleDatabaseUrl = (env: EnvMap = getEnv()) => env.TIMESCALE_DATABASE_URL;
 
 const globalPool = globalThis as unknown as { __temporalDriftPool?: pg.Pool };
 
@@ -37,6 +37,10 @@ export const getTimescalePool = () => {
   globalPool.__temporalDriftPool ??= new Pool({
     connectionString,
     max: 3,
+    connectionTimeoutMillis: 2500,
+    idleTimeoutMillis: 1000,
+    query_timeout: 4500,
+    statement_timeout: 4500,
     ssl: connectionString.includes("sslmode=disable") ? false : { rejectUnauthorized: false },
   });
   return globalPool.__temporalDriftPool;
