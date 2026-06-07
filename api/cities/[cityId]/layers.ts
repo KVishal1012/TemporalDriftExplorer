@@ -8,7 +8,7 @@ const headers = {
 };
 
 export default async function handler(request: Request) {
-  const segments = new URL(request.url).pathname.split("/");
+  const segments = new URL(request.url, "https://temporal.local").pathname.split("/");
   const cityId = segments[segments.length - 2] as CityKey;
   const profile = cityProfiles[cityId];
 

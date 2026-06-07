@@ -25,7 +25,7 @@ export default async function handler(request: Request) {
   const suppliedToken = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!token || suppliedToken !== token) return unauthorized();
 
-  const url = new URL(request.url);
+  const url = new URL(request.url, "https://temporal.local");
   const dryRun = url.searchParams.get("dryRun") === "true";
   const maxFeatures = Number(url.searchParams.get("maxFeatures"));
 
